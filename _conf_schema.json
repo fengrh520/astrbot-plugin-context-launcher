@@ -1,0 +1,98 @@
+{
+  "enabled": {
+    "type": "bool",
+    "description": "总开关。刚装好、想先看看这个实例每轮到底命不命中前缀缓存时保持开启；确认数据符合预期、或想要彻底零开销时再关掉（关掉后钩子直接返回）。",
+    "hint": "关闭后不统计、不告警、不写事件日志。",
+    "default": true
+  },
+  "mode": {
+    "type": "string",
+    "description": "运行模式。什么时候该开 guard：只有在你看过面板、确认「命中率低的主因是历史太长」之后才切过去；默认强烈建议 observe。",
+    "hint": "guard 会改写上下文，代价见 README「两种压缩」一节：改写历史可能让一次请求失去缓存命中。",
+    "options": ["observe", "guard"],
+    "labels": ["观察模式", "守卫模式"],
+    "subtitles": ["只读观测，一个字节都不改（推荐）", "允许按下面几项压缩改写历史，可能让一次请求失去缓存命中"],
+    "default": "observe"
+  },
+  "max_tail_chars": {
+    "type": "int",
+    "description": "尾部注入（extra_user_content_parts）字符上限，超了只告警、绝不改写。什么时候该调：面板里 tail 归因频繁、每轮未命中异常高时，先调低看看是不是尾部本身太长。0=不检查。",
+    "slider": {"min": 0, "max": 20000, "step": 100},
+    "default": 1800
+  },
+  "max_context_chars": {
+    "type": "int",
+    "description": "对话历史总字符上限，超了只告警、绝不改写。什么时候该开：想量化「我的历史到底多长」时填一个目标值（例如 200000），面板会给出预算告警次数。0=不检查。",
+    "slider": {"min": 0, "max": 2000000, "step": 1000},
+    "default": 0
+  },
+  "compress_tool_results": {
+    "type": "bool",
+    "description": "压缩一：工具结果裁剪。什么时候该开：确认有插件把巨型工具输出（网页正文、文件内容、日志）整段塞进历史，且这些结果后续几轮不再被引用时。默认关闭——改写历史中部的一条消息，会让它之后的前缀全部重新计费。",
+    "hint": "开启后命中率短期可能下降，请用面板的「断点轮 vs 干净轮」与「压缩节省」对账。",
+    "default": false
+  },
+  "compress_tool_keep_recent": {
+    "type": "int",
+    "description": "最近几条 tool 结果保留原文（避免模型马上要用却只拿到摘要）。什么时候该调大：任务需要模型反复回看最近工具输出时，调到 3~5。",
+    "slider": {"min": 0, "max": 20, "step": 1},
+    "default": 2
+  },
+  "compress_tool_preview_chars": {
+    "type": "int",
+    "description": "裁剪后保留工具结果首行的字数。什么时候该调大：工具结果首行就是关键结论（例如命令输出的第一行）时调到 200~500；调太小模型会看不出这里曾经有什么。",
+    "slider": {"min": 0, "max": 2000, "step": 10},
+    "default": 120
+  },
+  "compress_oversize": {
+    "type": "bool",
+    "description": "压缩二：超长单条消息裁剪。什么时候该开：单条消息动辄几万字（长文档、粘贴的日志、图片 OCR 全文），且这条消息已经不在最近几轮时。默认关闭，同样有改写历史导致缓存断点的代价。",
+    "hint": "裁剪保留首尾、省略中段；被裁消息后续每轮得到同一结果（确定性），不会每轮破缓存。",
+    "default": false
+  },
+  "compress_max_msg_chars": {
+    "type": "int",
+    "description": "单条消息超过多少字才裁。什么时候该调小：历史里 1~2 万字的中间消息很多、面板里 history 归因频繁时，可以先降到 8000 试。",
+    "slider": {"min": 1000, "max": 200000, "step": 500},
+    "default": 12000
+  },
+  "compress_keep_head_chars": {
+    "type": "int",
+    "description": "裁剪时保留开头多少字（结论、定义通常在这里）。什么时候该调大：被裁消息的开头就是关键上下文时。",
+    "slider": {"min": 0, "max": 50000, "step": 100},
+    "default": 4000
+  },
+  "compress_keep_tail_chars": {
+    "type": "int",
+    "description": "裁剪时保留结尾多少字（问题、结论通常在这里）。什么时候该调大：被裁消息末尾常有「接下来做什么」时。",
+    "slider": {"min": 0, "max": 50000, "step": 100},
+    "default": 1500
+  },
+  "compress_keep_recent_msgs": {
+    "type": "int",
+    "description": "最近几条消息永不裁剪，保证模型当前关注的对话完整。什么时候该调大：多轮追问任务里模型需要回看更多近期消息时调到 4~6。",
+    "slider": {"min": 0, "max": 30, "step": 1},
+    "default": 2
+  },
+  "compress_archive": {
+    "type": "bool",
+    "description": "裁剪掉的原文是否落盘到插件数据目录，便于事后查证、也让被裁内容不丢。什么时候该关：不在乎原文或磁盘紧张时；关掉后替换文案里不再出现归档路径。",
+    "hint": "归档只写在插件自己的数据目录内，超过归档目录上限后只统计、不再写盘。",
+    "default": true
+  },
+  "log_events": {
+    "type": "bool",
+    "description": "是否把每次请求的观测结果写成插件数据目录下的本地 JSONL。什么时候该关：磁盘紧张或不需要回看历史事件时；关掉后页面仍显示本次运行的内存统计。",
+    "default": true
+  },
+  "warn_on_break": {
+    "type": "bool",
+    "description": "检测到前缀断点或超预算时打一条日志，方便在日志里第一时间发现「谁改了历史」。什么时候该关：断点频繁、日志噪音太大时；面板统计不受影响。",
+    "default": true
+  },
+  "defer_to": {
+    "type": "list",
+    "description": "让路名单：检测到这些插件已安装时，本插件只观测并在页面说明、不重复动手压缩。什么时候该改：你还装了别的上下文压缩插件（例如 astrbot_plugin_context_slim），把它的插件名填进来；清空列表=谁都不让路。",
+    "default": ["astrbot_plugin_context_slim"]
+  }
+}

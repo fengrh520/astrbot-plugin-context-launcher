@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title data-i18n="views.dashboard.title" data-fallback="上下文管家">上下文管家</title>
+    <link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+    <div class="cl-app">
+        <!-- 顶部错误条：请求失败时显示，不弹窗 -->
+        <div id="error-bar" class="bar bar-error" hidden>
+            <span id="error-text" class="bar-text"></span>
+            <button id="error-retry" class="btn btn-ghost" type="button"
+                data-i18n="views.dashboard.action.retry" data-fallback="重试">重试</button>
+        </div>
+
+        <!-- provider 不返回缓存字段时的提示条 -->
+        <div id="notice-cache" class="bar bar-info" hidden></div>
+        <!-- 插件被停用时的提示条 -->
+        <div id="notice-disabled" class="bar bar-warn" hidden></div>
+        <!-- 预算提醒 -->
+        <div id="notice-budget" class="bar bar-warn" hidden></div>
+
+        <header class="cl-header">
+            <div class="cl-header-left">
+                <span class="cl-logo" aria-hidden="true"></span>
+                <h1 id="plugin-name" data-i18n="views.dashboard.title" data-fallback="上下文管家">上下文管家</h1>
+                <span id="mode-chip" class="chip chip-mode">—</span>
+                <span id="enabled-chip" class="chip chip-off" hidden></span>
+                <span id="cache-chip" class="chip chip-warn" hidden></span>
+            </div>
+            <div class="cl-header-right">
+                <span id="uptime" class="muted">—</span>
+                <span id="updated-at" class="muted"></span>
+                <button id="refresh-btn" class="btn" type="button"
+                    data-i18n="views.dashboard.action.refresh" data-fallback="刷新">刷新</button>
+            </div>
+        </header>
+
+        <p class="cl-subtitle" data-i18n="views.dashboard.description"
+            data-fallback="看清每一轮前缀有没有被改写，并按需压缩上下文。"></p>
+
+        <main class="grid">
+            <!-- 2. 四个 KPI 卡片 -->
+            <section class="kpis">
+                <div class="kpi">
+                    <div class="kpi-label" data-i18n="views.dashboard.kpi.hitRate"
+                        data-fallback="缓存命中率">缓存命中率</div>
+                    <div class="kpi-value" id="kpi-hit-rate">—</div>
+                    <div class="kpi-hint" id="kpi-hit-rate-hint"></div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-label" data-i18n="views.dashboard.kpi.missPerTurn"
+                        data-fallback="每轮未命中 token">每轮未命中 token</div>
+                    <div class="kpi-value" id="kpi-miss">—</div>
+                    <div class="kpi-hint" id="kpi-miss-hint"></div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-label" data-i18n="views.dashboard.kpi.breaks"
+                        data-fallback="前缀断点次数">前缀断点次数</div>
+                    <div class="kpi-value" id="kpi-breaks">—</div>
+                    <div class="kpi-hint" id="kpi-breaks-hint"></div>
+                </div>
+                <div class="kpi">
+                    <div class="kpi-label" data-i18n="views.dashboard.kpi.charsSaved"
+                        data-fallback="压缩节省字符">压缩节省字符</div>
+                    <div class="kpi-value" id="kpi-chars">—</div>
+                    <div class="kpi-hint" id="kpi-chars-hint"></div>
+                </div>
+            </section>
+
+            <!-- 3. 断点轮 vs 干净轮 -->
+            <section class="card">
+                <h2 class="card-title" data-i18n="views.dashboard.compare.title"
+                    data-fallback="断点轮 vs 干净轮">断点轮 vs 干净轮</h2>
+                <div class="compare-row">
+                    <span class="compare-label">
+                        <span data-i18n="views.dashboard.compare.break" data-fallback="断点轮">断点轮</span>
+                        <span class="compare-count" id="compare-break-count"></span>
+                    </span>
+                    <div class="compare-track">
+                        <div class="compare-fill fill-break" id="compare-break"></div>
+                    </div>
+                    <span class="compare-value" id="compare-break-value">—</span>
+                </div>
+                <div class="compare-row">
+                    <span class="compare-label">
+                        <span data-i18n="views.dashboard.compare.clean" data-fallback="干净轮">干净轮</span>
+                        <span class="compare-count" id="compare-clean-count"></span>
+                    </span>
+                    <div class="compare-track">
+                        <div class="compare-fill fill-clean" id="compare-clean"></div>
+                    </div>
+                    <span class="compare-value" id="compare-clean-value">—</span>
+                </div>
+                <p class="conclusion" id="compare-conclusion"></p>
+            </section>
+
+            <!-- 4. 归因分布 -->
+            <section class="card">
+                <h2 class="card-title" data-i18n="views.dashboard.causes.title"
+                    data-fallback="归因分布">归因分布</h2>
+                <div class="causes" id="causes-list"></div>
+            </section>
+
+            <!-- 5. 命中率走势 -->
+            <section class="card card-wide">
+                <h2 class="card-title" data-i18n="views.dashboard.trend.title"
+                    data-fallback="命中率走势">命中率走势</h2>
+                <div class="chart-wrap">
+                    <canvas id="trend-canvas"></canvas>
+                </div>
+                <p class="empty" id="trend-empty" hidden></p>
+                <div class="chart-legend">
+                    <span class="legend-item">
+                        <i class="legend-line"></i>
+                        <span data-i18n="views.dashboard.trend.legend.rate"
+                            data-fallback="命中率">命中率</span>
+                    </span>
+                    <span class="legend-item">
+                        <i class="legend-dot"></i>
+                        <span data-i18n="views.dashboard.trend.legend.break"
+                            data-fallback="断点请求">断点请求</span>
+                    </span>
+                </div>
+            </section>
+
+            <!-- 6. 最近请求 -->
+            <section class="card card-wide">
+                <h2 class="card-title" data-i18n="views.dashboard.recent.title"
+                    data-fallback="最近请求">最近请求</h2>
+                <div class="table-wrap">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th data-i18n="views.dashboard.recent.col.time"
+                                    data-fallback="时间">时间</th>
+                                <th data-i18n="views.dashboard.recent.col.cause"
+                                    data-fallback="归因">归因</th>
+                                <th class="num" data-i18n="views.dashboard.recent.col.msgs"
+                                    data-fallback="历史条数">历史条数</th>
+                                <th class="num" data-i18n="views.dashboard.recent.col.prompt"
+                                    data-fallback="prompt">prompt</th>
+                                <th class="num" data-i18n="views.dashboard.recent.col.hit"
+                                    data-fallback="命中">命中</th>
+                                <th class="num" data-i18n="views.dashboard.recent.col.miss"
+                                    data-fallback="未命中">未命中</th>
+                                <th class="num" data-i18n="views.dashboard.recent.col.est"
+                                    data-fallback="预估">预估</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-body"></tbody>
+                    </table>
+                </div>
+                <p class="empty" id="recent-empty" hidden></p>
+            </section>
+        </main>
+
+        <!-- 7. 底部信息 -->
+        <footer class="cl-footer">
+            <span id="footer-version"></span>
+            <span id="footer-priority"></span>
+            <span id="footer-tokens"></span>
+            <span id="footer-budget"></span>
+            <span id="footer-defer"></span>
+        </footer>
+    </div>
+
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

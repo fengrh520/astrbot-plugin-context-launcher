@@ -1,0 +1,19 @@
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# 系统垃圾文件
+.DS_Store
+Thumbs.db
+
+# 插件运行期数据（事件 JSONL / 归档原文）不随仓库分发
+data/
+*.log
+
+# 编辑器 / 虚拟环境
+.idea/
+.vscode/
+.venv/
+venv/

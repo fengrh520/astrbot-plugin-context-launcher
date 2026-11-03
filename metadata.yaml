@@ -1,0 +1,20 @@
+name: astrbot_plugin_context_launcher
+display_name: 上下文管家
+short_desc: 看清每一轮前缀有没有被改写，并按需压缩上下文
+desc: >
+  只读观测 + 可选压缩的上下文成本面板。插件在 on_llm_request 最低优先级（-20）抓取装配完成的最终请求，
+  逐条比对 system_prompt / 工具定义 / 对话历史的指纹，判断这一轮是「只追加」还是「前缀被改写」，
+  并给出归因（系统提示、工具定义、历史改写、工具结果压缩、窗口回退、仅尾部变化）。
+  再结合 provider 返回的真实 usage（prompt_cache_hit_tokens / prompt_cache_miss_tokens）
+  算出缓存命中率与每轮未命中 token，用「断点轮 vs 干净轮」的平均未命中差值，
+  量化「改写历史」这件事的真实价格——解决「命中率低，但不知道是谁改的、改了值不值」的问题。
+  默认 mode=observe，一个字节都不改；用户主动打开后可启用两种确定性压缩（工具结果裁剪、超长消息裁剪），
+  并可用 /上下文 压缩 on|off 一键开关。
+  内置 WebUI / 桌面 Launcher 可视化视图：命中率、每轮未命中、前缀断点、压缩节省、归因分布、
+  命中率走势与最近请求明细。不注册任何 LLM 工具，不联网，只写自己的数据目录。
+version: 2.0.0
+author: local
+repo: "https://github.com/fengrh520/astrbot-plugin-context-launcher"
+astrbot_version: ">=4.16,<5"
+support_platforms: [aiocqhttp, qq_official]
+tags: [context, cache, token, cost, observability, dashboard]

@@ -1,0 +1,557 @@
+/*
+ * 上下文管家 · 插件视图样式
+ * - 主题用 CSS 变量：:root 为浅色，[data-theme="dark"] 覆盖深色
+ * - 不使用 color-mix()（旧 WebView 不支持），半透明色一律写 rgba()
+ * - 宽屏两列，窄屏单列
+ */
+
+:root {
+    --cl-bg: #f4f6fa;
+    --cl-panel: #ffffff;
+    --cl-panel-2: #f8fafc;
+    --cl-text: #1f2430;
+    --cl-muted: #667085;
+    --cl-border: #e3e8ef;
+    --cl-accent: #2f6feb;
+    --cl-accent-soft: rgba(47, 111, 235, 0.12);
+    --cl-good: #14915c;
+    --cl-good-soft: rgba(20, 145, 92, 0.14);
+    --cl-warn: #b7791f;
+    --cl-warn-soft: rgba(183, 121, 31, 0.14);
+    --cl-bad: #d92d20;
+    --cl-bad-soft: rgba(217, 45, 32, 0.12);
+    --cl-track: #e9eef5;
+    --cl-grid: #edf1f7;
+    --cl-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+}
+
+[data-theme="dark"] {
+    --cl-bg: #14161b;
+    --cl-panel: #1c1f26;
+    --cl-panel-2: #23262e;
+    --cl-text: #e6e9ef;
+    --cl-muted: #98a2b3;
+    --cl-border: #2c313b;
+    --cl-accent: #6f9bff;
+    --cl-accent-soft: rgba(111, 155, 255, 0.16);
+    --cl-good: #4ade80;
+    --cl-good-soft: rgba(74, 222, 128, 0.16);
+    --cl-warn: #f0b429;
+    --cl-warn-soft: rgba(240, 180, 41, 0.16);
+    --cl-bad: #ff6b6b;
+    --cl-bad-soft: rgba(255, 107, 107, 0.16);
+    --cl-track: #2b303a;
+    --cl-grid: #262b34;
+    --cl-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    background: var(--cl-bg);
+    color: var(--cl-text);
+    font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+}
+
+.cl-app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 16px;
+}
+
+/* ===================== 提示条 ===================== */
+
+/* 提示条、徽标用了 display:flex/inline-flex，会盖掉 HTML 的 hidden 属性，
+   这里统一兜底：hidden 必须真的隐藏（否则空提示条会全露出来）。 */
+[hidden] {
+    display: none !important;
+}
+
+.bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 12px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--cl-border);
+    background: var(--cl-panel);
+    font-size: 13px;
+}
+
+.bar-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.bar-error {
+    border-color: var(--cl-bad);
+    background: var(--cl-bad-soft);
+    color: var(--cl-bad);
+}
+
+.bar-info {
+    border-color: var(--cl-accent);
+    background: var(--cl-accent-soft);
+    color: var(--cl-accent);
+}
+
+.bar-warn {
+    border-color: var(--cl-warn);
+    background: var(--cl-warn-soft);
+    color: var(--cl-warn);
+}
+
+/* ===================== 顶部 ===================== */
+
+.cl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--cl-border);
+    border-radius: 10px;
+    background: var(--cl-panel);
+    box-shadow: var(--cl-shadow);
+}
+
+.cl-header-left,
+.cl-header-right {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.cl-logo {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--cl-accent);
+    box-shadow: 0 0 0 4px var(--cl-accent-soft);
+}
+
+.cl-header h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.2px;
+}
+
+.cl-subtitle {
+    margin: 8px 2px 12px;
+    color: var(--cl-muted);
+    font-size: 12.5px;
+}
+
+.muted {
+    color: var(--cl-muted);
+    font-size: 12.5px;
+}
+
+.chip {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    line-height: 18px;
+    background: var(--cl-panel-2);
+    border: 1px solid var(--cl-border);
+    color: var(--cl-muted);
+    white-space: nowrap;
+}
+
+.chip-mode {
+    background: var(--cl-accent-soft);
+    border-color: var(--cl-accent);
+    color: var(--cl-accent);
+}
+
+.chip-off {
+    background: var(--cl-bad-soft);
+    border-color: var(--cl-bad);
+    color: var(--cl-bad);
+}
+
+.chip-warn {
+    background: var(--cl-warn-soft);
+    border-color: var(--cl-warn);
+    color: var(--cl-warn);
+}
+
+.btn {
+    padding: 5px 14px;
+    border-radius: 7px;
+    border: 1px solid var(--cl-accent);
+    background: var(--cl-accent);
+    color: #ffffff;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn:disabled {
+    opacity: 0.55;
+    cursor: default;
+}
+
+.btn-ghost {
+    background: transparent;
+    color: var(--cl-bad);
+    border-color: var(--cl-bad);
+    padding: 3px 10px;
+    font-size: 12px;
+}
+
+/* ===================== 栅格 ===================== */
+
+.grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.card {
+    background: var(--cl-panel);
+    border: 1px solid var(--cl-border);
+    border-radius: 10px;
+    padding: 13px 14px;
+    box-shadow: var(--cl-shadow);
+    min-width: 0;
+}
+
+.card-wide {
+    grid-column: 1 / -1;
+}
+
+.card-title {
+    margin: 0 0 10px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--cl-text);
+}
+
+.kpis {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.kpi {
+    background: var(--cl-panel);
+    border: 1px solid var(--cl-border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    box-shadow: var(--cl-shadow);
+    min-width: 0;
+}
+
+.kpi-label {
+    color: var(--cl-muted);
+    font-size: 12.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.kpi-value {
+    margin-top: 4px;
+    font-size: 25px;
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--cl-text);
+    word-break: break-all;
+}
+
+.kpi-value.good {
+    color: var(--cl-good);
+}
+
+.kpi-value.warn {
+    color: var(--cl-warn);
+}
+
+.kpi-value.bad {
+    color: var(--cl-bad);
+}
+
+.kpi-hint {
+    margin-top: 3px;
+    color: var(--cl-muted);
+    font-size: 12px;
+    min-height: 18px;
+    word-break: break-word;
+}
+
+/* ===================== 断点轮 vs 干净轮 ===================== */
+
+.compare-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 9px;
+}
+
+.compare-label {
+    flex: 0 0 96px;
+    font-size: 12.5px;
+    color: var(--cl-text);
+    display: flex;
+    flex-direction: column;
+}
+
+.compare-count {
+    color: var(--cl-muted);
+    font-size: 11.5px;
+}
+
+.compare-track {
+    flex: 1 1 auto;
+    height: 12px;
+    border-radius: 999px;
+    background: var(--cl-track);
+    overflow: hidden;
+    min-width: 30px;
+}
+
+.compare-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    transition: width 0.25s ease;
+}
+
+.fill-break {
+    background: var(--cl-bad);
+}
+
+.fill-clean {
+    background: var(--cl-good);
+}
+
+.compare-value {
+    flex: 0 0 62px;
+    text-align: right;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--cl-text);
+}
+
+.conclusion {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--cl-panel-2);
+    border: 1px solid var(--cl-border);
+    color: var(--cl-text);
+    font-size: 12.5px;
+    word-break: break-word;
+}
+
+/* ===================== 归因分布 ===================== */
+
+.causes {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.cause-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.cause-name {
+    flex: 0 0 96px;
+    font-size: 12.5px;
+    color: var(--cl-text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cause-track {
+    flex: 1 1 auto;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--cl-track);
+    overflow: hidden;
+    min-width: 30px;
+}
+
+.cause-fill {
+    height: 100%;
+    width: 0;
+    border-radius: 999px;
+    background: var(--cl-accent);
+    transition: width 0.25s ease;
+}
+
+.cause-meta {
+    flex: 0 0 auto;
+    color: var(--cl-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+
+.empty {
+    margin: 6px 0 0;
+    color: var(--cl-muted);
+    font-size: 12.5px;
+}
+
+/* ===================== 走势图 ===================== */
+
+.chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 200px;
+}
+
+#trend-canvas {
+    display: block;
+    width: 100%;
+    height: 200px;
+}
+
+.chart-legend {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 6px;
+    color: var(--cl-muted);
+    font-size: 12px;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.legend-line {
+    display: inline-block;
+    width: 14px;
+    height: 2px;
+    background: var(--cl-accent);
+    border-radius: 2px;
+}
+
+.legend-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--cl-bad);
+}
+
+/* ===================== 表格 ===================== */
+
+.table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.table th,
+.table td {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--cl-border);
+    text-align: left;
+    white-space: nowrap;
+}
+
+.table th {
+    color: var(--cl-muted);
+    font-weight: 600;
+    background: var(--cl-panel-2);
+}
+
+.table th.num,
+.table td.num {
+    text-align: right;
+}
+
+.table td.bad {
+    color: var(--cl-bad);
+}
+
+.table tbody tr:hover {
+    background: var(--cl-panel-2);
+}
+
+.row-break td:first-child {
+    border-left: 3px solid var(--cl-bad);
+    padding-left: 5px;
+}
+
+/* ===================== 底部 ===================== */
+
+.cl-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    margin-top: 14px;
+    padding: 10px 2px;
+    color: var(--cl-muted);
+    font-size: 12px;
+    border-top: 1px solid var(--cl-border);
+}
+
+/* ===================== 响应式：窄屏单列 ===================== */
+
+@media (max-width: 720px) {
+    .cl-app {
+        padding: 12px;
+    }
+
+    .grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .card-wide {
+        grid-column: auto;
+    }
+
+    .kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .kpi-value {
+        font-size: 21px;
+    }
+
+    .compare-label,
+    .cause-name {
+        flex-basis: 74px;
+    }
+
+    .cl-header {
+        align-items: flex-start;
+    }
+}
