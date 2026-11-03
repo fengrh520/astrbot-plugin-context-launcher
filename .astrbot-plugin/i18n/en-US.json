@@ -1,0 +1,139 @@
+{
+  "metadata": {
+    "display_name": "Context Launcher",
+    "short_desc": "See whether the prefix was rewritten each turn, and compress context on demand",
+    "desc": "A read-only-observation plus optional-compression dashboard for context cost: it captures the fully assembled final request, tells whether a turn only appended or rewrote the prefix, and turns provider usage into hit rate, miss-per-turn and break attribution. Observe by default; not a single byte is changed."
+  },
+  "config": {
+    "enabled": {
+      "description": "Master switch. Keep it on when you first install the plugin and want to see whether prefix caching really hits; turn it off for zero overhead (hooks return immediately).",
+      "hint": "When off: no stats, no warnings, no event log."
+    },
+    "mode": {
+      "description": "Run mode. When to switch to guard: only after you have read the dashboard and confirmed that an oversized history is the main reason for a low hit rate. observe is strongly recommended by default.",
+      "hint": "guard rewrites context; see the README's compression section — a rewrite may cost the cache hit of one request.",
+      "labels": [
+        "Observe",
+        "Guard"
+      ],
+      "subtitles": [
+        "Read-only: not a single byte is changed (recommended)",
+        "Lets the compressions below rewrite history, which may cost a cache hit"
+      ]
+    },
+    "max_tail_chars": {
+      "description": "Character budget for tail injection (extra_user_content_parts). Exceeding it only warns, never rewrites. When to tune: if tail-cause breaks are frequent and miss-per-turn is high, lower it to check whether the tail itself is too long. 0 = no check."
+    },
+    "max_context_chars": {
+      "description": "Character budget for the whole conversation history. Exceeding it only warns, never rewrites. When to enable: set a target (e.g. 200000) to quantify how long your history really is; the dashboard reports budget warnings. 0 = no check."
+    },
+    "compress_tool_results": {
+      "description": "Compression 1: tool-result trimming. When to enable: when some plugin dumps huge tool output (web pages, file contents, logs) into the history and those results are no longer referenced. Off by default — rewriting a message mid-history makes everything after it re-bill.",
+      "hint": "Hit rate may dip at first; reconcile with the dashboard's break-vs-clean and chars-saved figures."
+    },
+    "compress_tool_keep_recent": {
+      "description": "How many recent tool results keep their raw text, so the model does not get a summary exactly when it needs the content. When to raise: tasks where the model re-reads recent tool output — try 3-5."
+    },
+    "compress_tool_preview_chars": {
+      "description": "Characters of the tool result's first line kept after trimming. When to raise: the first line carries the key conclusion (e.g. a command's output) — try 200-500."
+    },
+    "compress_oversize": {
+      "description": "Compression 2: oversize single-message trimming. When to enable: single messages of tens of thousands of characters (long documents, pasted logs, full OCR text) that are no longer in the recent turns. Off by default; it also rewrites history.",
+      "hint": "Head and tail are kept, the middle is elided; the same message is trimmed the same way every turn, so the cache is not broken repeatedly."
+    },
+    "compress_max_msg_chars": {
+      "description": "Only messages longer than this are trimmed. When to lower: many 10k-20k-character messages sit mid-history and the dashboard shows frequent history breaks — try 8000."
+    },
+    "compress_keep_head_chars": {
+      "description": "Characters kept from the head of a trimmed message (where conclusions and definitions usually are). Raise it when the head of the trimmed message is the important context."
+    },
+    "compress_keep_tail_chars": {
+      "description": "Characters kept from the tail of a trimmed message (where questions and follow-ups usually are)."
+    },
+    "compress_keep_recent_msgs": {
+      "description": "The most recent N messages are never trimmed, keeping the conversation the model currently cares about intact. When to raise: multi-turn follow-up tasks where the model looks further back — try 4-6."
+    },
+    "compress_archive": {
+      "description": "Whether trimmed-away raw text is archived inside the plugin's own data directory, so nothing is lost and you can verify later. When to turn off: you do not need the raw text or disk is tight; the replacement marker then omits the archive path.",
+      "hint": "Archives stay inside the plugin data directory and stop being written once the archive cap is reached."
+    },
+    "log_events": {
+      "description": "Write each request's observation to a local JSONL file inside the plugin data directory. When to turn off: disk is tight or you do not need past events; the dashboard still shows in-memory stats for this run."
+    },
+    "warn_on_break": {
+      "description": "Log a message when a prefix break or a budget overflow is detected, so you spot the culprit in the logs. When to turn off: breaks are frequent and the log gets noisy; dashboard stats are unaffected."
+    },
+    "defer_to": {
+      "description": "Yield list: when these plugins are installed, this plugin only observes and says so on the dashboard instead of compressing a second time. When to edit: add another context plugin you also run (e.g. astrbot_plugin_context_slim); an empty list means never yield."
+    }
+  },
+  "views": {
+    "dashboard": {
+      "title": "Context Launcher Dashboard",
+      "description": "Cache hit rate, prefix-break attribution and compression savings at a glance.",
+      "refresh": "Refresh",
+      "loading": "Loading…",
+      "empty": "No data yet",
+      "load_failed": "Failed to load",
+      "retry": "Retry",
+      "mode": "Mode",
+      "mode_observe": "Observe",
+      "mode_guard": "Guard",
+      "uptime": "Uptime",
+      "status": "Status",
+      "status_enabled": "Enabled",
+      "status_disabled": "Disabled",
+      "kpi_hit_rate": "Hit rate",
+      "kpi_miss_per_turn": "Miss per turn",
+      "kpi_breaks": "Prefix breaks",
+      "kpi_chars_saved": "Chars saved",
+      "unit_tokens": "tokens",
+      "unit_chars": "chars",
+      "unit_times": "times",
+      "section_break_vs_clean": "Break turns vs clean turns",
+      "break_avg": "Break turns",
+      "clean_avg": "Clean turns",
+      "break_count": "Break count",
+      "clean_count": "Clean count",
+      "conclusion_break_expensive": "Break turns miss {ratio}× as many tokens as clean turns — rewriting history is costing money.",
+      "conclusion_no_break": "No break turn in this run yet; the prefix has been stable.",
+      "section_causes": "Attribution",
+      "section_trend": "Hit-rate trend",
+      "trend_legend_break": "Red dot = break request",
+      "trend_legend_normal": "Blue line = hit rate",
+      "section_recent": "Recent requests",
+      "col_time": "Time",
+      "col_cause": "Cause",
+      "col_history": "History",
+      "col_prompt": "Prompt",
+      "col_hit": "Hit",
+      "col_miss": "Miss",
+      "col_out": "Out",
+      "col_est": "Est.",
+      "cache_unsupported": "This model does not return cache-hit data; only totals are counted",
+      "cache_unsupported_short": "totals only",
+      "footer_version": "Version",
+      "footer_priority": "Priority",
+      "footer_enabled": "Enabled",
+      "footer_prompt_total": "Total prompt",
+      "footer_out_total": "Total output",
+      "budget_warns": "Budget warnings",
+      "defer_to": "Yielding to",
+      "cause_first": "First turn",
+      "cause_append": "Append only",
+      "cause_tail": "Tail only",
+      "cause_system": "System prompt changed",
+      "cause_tools": "Tool defs changed",
+      "cause_history": "History rewritten",
+      "cause_history_tool": "Tool result rewritten",
+      "cause_history_shrink": "Window rewind",
+      "cause_trim": "Trimmed by plugin"
+    }
+  },
+  "pages": {
+    "dashboard": {
+      "title": "Context Launcher Dashboard",
+      "description": "Cache hit rate, prefix-break attribution and compression savings at a glance."
+    }
+  }
+}
