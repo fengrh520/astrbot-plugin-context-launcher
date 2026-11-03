@@ -13,7 +13,7 @@ desc: >
   内置 WebUI / 桌面 Launcher 可视化视图：命中率、每轮未命中、前缀断点、压缩节省、归因分布、
   命中率走势与最近请求明细。不注册任何 LLM 工具，不联网，只写自己的数据目录。
 version: 2.0.0
-author: local
+author: fengrh520
 repo: "https://github.com/fengrh520/astrbot-plugin-context-launcher"
 astrbot_version: ">=4.16,<5"
 support_platforms: [aiocqhttp, qq_official]
