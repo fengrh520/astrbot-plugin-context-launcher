@@ -6,6 +6,8 @@ It reads the assembled request and does not touch it. Default mode is `observe`:
 
 AstrBot 4.16+ · no third-party dependencies · MIT · v2.0.0 · [中文](README.md)
 
+Prefix caching is a discount from the provider: if the start of this request is byte-identical to the last one, that part is billed at the cache rate, usually about a tenth of the normal price. So the expensive thing isn't a long context — it's a context whose beginning keeps changing, and everything after the change point gets recomputed.
+
 ![Dashboard](docs/images/dashboard-zh.png)
 
 > The screenshot uses sample data; the dashboard follows the WebUI language.
