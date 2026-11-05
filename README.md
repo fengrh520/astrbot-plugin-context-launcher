@@ -8,6 +8,8 @@ AstrBot 4.16+ · 无第三方依赖 · MIT · v2.0.0 · [English](README.en.md)
 
 ![面板](docs/images/dashboard-zh.png)
 
+> 图里是示例数据，面板文案跟着 WebUI 的语言走。
+
 ## 装
 
 ```bash

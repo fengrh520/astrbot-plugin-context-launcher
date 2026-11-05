@@ -8,6 +8,8 @@ AstrBot 4.16+ · no third-party dependencies · MIT · v2.0.0 · [中文](README
 
 ![Dashboard](docs/images/dashboard-zh.png)
 
+> The screenshot uses sample data; the dashboard follows the WebUI language.
+
 ## Install
 
 ```bash
