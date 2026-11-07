@@ -46,12 +46,9 @@ Provider side (`deepseek-flash`, same machine):
 
 | Range | Requests | Hit rate | Miss per request |
 |---|--:|--:|--:|
-| 10-27 ~ 11-02 | 561 | 66.0% | 8,453 |
 | 11-03 ~ 11-07 | 87 | 90.2% | 3,912 |
-| Last 7 days | 177 | 81.9% | 5,702 |
-| All (from 10-23) | 1,332 | 78.9% | 6,481 |
 
-The last two rows exist for reconciliation. The official console counts the whole account, including days before the optimization, so it reads 79–82%. This panel only counts requests after the plugin was installed, hence the low 90s. Both are correct; the difference is the window. Compare like for like.
+The range starts on the day the plugin was installed. The official console counts the whole account with a different window; compare like for like.
 
 One caveat: before installing the plugin I had already cut tool definitions (about 100 down to 45) and shrank the history (1.06M characters to 216k). The figures above cannot be attributed to any single change.
 
