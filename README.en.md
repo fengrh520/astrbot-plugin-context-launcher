@@ -1,173 +1,181 @@
 # Context Launcher
 
-An AstrBot plugin that shows whether each LLM request actually hit the prefix cache — and when it didn't, what changed the prefix.
-
-It reads the assembled request and does not touch it. Default mode is `observe`: not a single byte is modified. No LLM tools registered, no network calls, one JSONL file in its own data directory.
+> Per-request attribution for prefix-cache misses, reconciled against the provider's own usage figures. Observation is read-only by default; compression is off by default.
 
 AstrBot 4.16+ · no third-party dependencies · MIT · v2.0.1 · [中文](README.md)
 
-Prefix caching is a discount from the provider: if the start of this request is byte-identical to the last one, that part is billed at the cache rate, usually about a tenth of the normal price. So the expensive thing isn't a long context — it's a context whose beginning keeps changing, and everything after the change point gets recomputed.
+## Overview
+
+Every turn, AstrBot assembles the system prompt, tool definitions, conversation history and tail injections into one request. A provider's prefix cache only hits when this request shares a byte-exact prefix with the previous one: the cached part is billed at a discount, the rest at full price. When the hit rate drops, the bill alone cannot tell you which component changed the prefix.
+
+The plugin addresses this in three parts:
+
+- **Attribution**: each request fingerprints the system prompt, tool definitions, every history message and the tail injection, then diffs against the previous turn in the same session. The first divergence is classified into one of eight causes (append, tail change, history rewrite, tool result rewrite, system prompt change, history shrink, session start, own compression).
+- **Reconciliation**: hit and miss tokens come straight from the provider's `prompt_cache_hit_tokens` / `prompt_cache_miss_tokens`. Nothing is estimated. Break turns and clean turns are averaged separately, so you can tell whether rewriting history actually pays off.
+- **Compression** (optional, off by default): tool-result trimming and oversized-message trimming. Both are deterministic — the same message yields the same result on every turn, so the plugin never causes a break on its own.
+
+Deliberately out of scope:
+
+- No LLM tools are registered. Tool definitions sit in the prompt every turn and are a permanent cost; an observability plugin should not add to it.
+- No LLM summarization. AstrBot's core overflow strategy already covers that, and summaries differ every turn — writing them back into history means rewriting the prefix continuously, the exact cost this plugin is built to remove.
+- No access to other plugins' data. When a competing plugin is present, the plugin defers per `defer_to`, observes only, and says so on the panel.
+
+## Effect
 
 ![Dashboard](docs/images/dashboard-zh.png)
 
-> The screenshot uses sample data; the dashboard follows the WebUI language.
+> Panel illustration: figures come from real request records of 2026-11-07; UI language follows the WebUI setting.
 
-## Install
+### Measured data
 
-```bash
-cp -r astrbot_plugin_context_launcher /path/to/astrbot/data/plugins/
-docker restart astrbot
-```
+Environment: Tencent Cloud 4C4G, Ubuntu 24.04, AstrBot 4.29.3 + OneBot v11, model `deepseek-flash`, `mode=observe`, compression off.
 
-After the restart the WebUI plugin page has a "Context Launcher → Dashboard" entry: hit rate, average miss tokens per request, break count, characters saved by compression. It refreshes itself every 15 seconds.
+Plugin side (54 requests, 2026-11-04 02:13 through 11-07 19:08):
 
-If you'd rather not open a page, send `/上下文`.
-
-## What it actually looks at
-
-Plenty of things in AstrBot mutate a request: persona, tools, memory plugins, context compression. They all hook `on_llm_request` at priorities between 0 and 100. This plugin uses `-20`.
-
-Negative priorities run last, so it sees the payload after everyone has injected — the one that is about to be sent.
-
-It fingerprints three things separately: the system prompt, the tool definitions, and every history message. Then it compares them against the previous turn of the same session:
-
-| Cause | Meaning |
+| Metric | Value |
 |---|---|
-| `append` | Prefix is byte-identical, messages were only appended. The good case |
-| `tail` | Only the injected tail changed |
-| `system` | System prompt changed, everything is recomputed |
-| `tools` | Tool definitions changed, everything is recomputed |
-| `history` | A message in the middle of the history was rewritten |
-| `history_tool` | Same, and the rewritten message is a tool result |
-| `history_shrink` | History got shorter — the window slid back |
+| Requests | 54 |
+| Hit rate | 90.2% (token-weighted) |
+| Median per-turn hit rate | 94.1% |
+| Average miss | 3,871 tokens/request (median 2,352, worst 22,293) |
+| Prefix breaks | 2 (an old message edited in place) |
+| System prompt | 12,840 chars (13,645 after a summary is injected) |
+| Tool definitions | 45 |
 
-Hit rate is not estimated. It comes from the provider's `prompt_cache_hit_tokens` and `prompt_cache_miss_tokens`. When a provider doesn't return those fields the dashboard says so plainly instead of showing a fake 0%.
+Provider side (`deepseek-flash`, same machine):
 
-## Four days on my own box
+| Range | Requests | Hit rate | Miss per request |
+|---|--:|--:|--:|
+| 10-27 ~ 11-02 | 561 | 66.0% | 8,453 |
+| 11-03 ~ 11-07 | 87 | 90.2% | 3,912 |
+| Last 7 days | 177 | 81.9% | 5,702 |
+| All (from 10-23) | 1,332 | 78.9% | 6,481 |
 
-A 4C4G Tencent Cloud instance running OneBot and DeepSeek, observe mode, all compression off.
+The last two rows exist for reconciliation. The official console counts the whole account, including days before the optimization, so it reads 79–82%. This panel only counts requests after the plugin was installed, hence the low 90s. Both are correct; the difference is the window. Compare like for like.
 
-54 requests the plugin recorded (11-04 02:13 through 11-07 19:08):
+One caveat: before installing the plugin I had already cut tool definitions (about 100 down to 45) and shrank the history (1.06M characters to 216k). The figures above cannot be attributed to any single change.
 
-```
-48 turns had an unchanged prefix, 4 were session starts, 2 had an old message edited in place
-On the unchanged ones: median hit rate 94.1%, median miss 2,352 tokens (worst 22,293, best 232)
-System prompt 12,840 chars (13,645 after a summary is injected), 45 tool definitions — in the prompt every turn
-History stayed between 102 and 200 messages; it was trimmed once
-```
+## Features
 
-The provider's own numbers from the same machine (`deepseek-flash`):
+| Feature | Description | Default |
+|---|---|:--:|
+| Request attribution | Locate the first divergence per turn and classify its cause | on |
+| Usage reconciliation | Hit rate from provider usage, break turns vs clean turns | on |
+| Dashboard | WebUI plugin page showing cause distribution, recent requests, budget warnings | on |
+| Commands | `/上下文` family, for when the dashboard is unavailable | on |
+| Tool-result trimming | Collapse older tool results in history to one line | off |
+| Oversized-message trimming | Keep head and tail, drop the middle, archive the original | off |
+| Break warnings | Log when a break or budget overrun is detected | on |
 
-```
-10-27 ~ 11-02    561 requests   hit 66.0%   8,453 miss tokens per request
-11-03 ~ 11-07     87 requests   hit 90.2%   3,912 miss tokens per request
-last 7 days      177 requests   hit 81.9%   5,702 miss tokens per request
-all (from 10-23) 1,332 requests hit 78.9%   6,481 miss tokens per request
-```
+## Installation
 
-The last two rows exist for reconciliation. The official console counts everything on the account, so it lands in the 79–82% range; this dashboard only counts what happened after the plugin was installed, i.e. the post-optimization days, so it reads low-90s. Both are right — they just cover different windows. Compare like for like.
+**Marketplace**: search for "上下文管家" on the AstrBot WebUI plugin page, install, restart.
 
-Early in November I cut tool definitions from ~100 to 45 and shrank the history from 1.06M characters to 216k. The plugin was installed after that, so what it recorded is the post-change state. More than one thing changed in between, so these numbers are not the credit of any single edit.
+**Manual**: place the repository under `data/plugins/astrbot_plugin_context_launcher/` and restart AstrBot. Only bundled AstrBot components are used.
 
-The interesting row is this one:
-
-```
-11-05 10:14   append   hit 9,728   miss 22,293   took 123 seconds
-```
-
-The prefix did not change at all — attribution is `append` — and the hit rate was still 30%. Eight hours had passed since the previous turn, so the provider's cache had most likely expired.
-
-Which is the point: attribution and billing are two different axes. A payload nobody touched is not necessarily a cheap payload. Looking at only one of them gets you the wrong conclusion, and that is why the dashboard keeps "break turns" and "clean turns" apart.
-
-## Two compressions, both off by default
-
-The cost first. A compression has to rewrite one message in the history, and a cache hit requires a byte-identical prefix, so everything after that message is billed again. What you save is a few tokens per turn from then on; what you pay is one recomputation from the break point. The "break turns vs clean turns" comparison exists to put a number on that trade.
-
-Both compressions are deterministic: the same history message produces the same result every turn, so the prefix isn't broken again on the next request.
-
-| Compression | Config | When it pays off | Cost |
-|---|---|---|---|
-| Tool-result trimming | `compress_tool_results` | Some plugin dumps whole web pages, files or logs into history and nothing references them any more | Rewrites mid-history; raise `compress_tool_keep_recent` alongside it |
-| Oversize message trimming | `compress_oversize` | Single messages of tens of thousands of characters, already out of the recent turns | Head and tail kept, middle elided, original archived |
-
-Both require `mode: guard`. Nothing is rewritten in `observe`. If you don't want to edit config, `/上下文 压缩 on` and `/上下文 压缩 off` toggle them at runtime; nothing is written to disk.
-
-## Why there is no "summarise the old conversation with an LLM"
-
-Because AstrBot core already does it. When the context really overflows, core's overflow strategy fires and shortens the old conversation. Implementing it again would be duplicated work that fights the core's own rewrite.
-
-More importantly: an LLM summary reads differently every turn. Writing it back into history means rewriting the prefix on every request — exactly the cost this plugin exists to remove. Trimming can be made deterministic. Summaries cannot.
-
-If you do want summaries, use core's overflow strategy. It follows the hard context-window limit, which is what it is for.
+**First run**: keep `mode=observe`, chat for a few turns, then open the dashboard. Read the cause distribution before enabling compression; compression only runs in `guard` mode.
 
 ## Configuration
 
-Mirrors `_conf_schema.json`. Most people only need the first two rows.
+Mirrors `_conf_schema.json`. In most deployments only the first two entries matter.
 
-| Key | Type | Default | Notes |
+| Key | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | bool | `true` | Master switch; the hooks return immediately when off |
-| `mode` | string | `observe` | `observe` only measures; `guard` allows compression |
-| `max_tail_chars` | int | `3000` | Warn when the injected tail exceeds this; `0` disables |
-| `max_context_chars` | int | `0` | Warn when total history chars exceed this; `0` disables |
-| `compress_tool_results` | bool | `false` | Trim tool results |
-| `compress_tool_keep_recent` | int | `2` | Keep the last N tool results verbatim |
-| `compress_tool_preview_chars` | int | `120` | Characters kept from the first line |
-| `compress_oversize` | bool | `false` | Trim oversized messages |
-| `compress_max_msg_chars` | int | `12000` | Threshold before trimming |
-| `compress_keep_head_chars` | int | `4000` | Head kept when trimming |
-| `compress_keep_tail_chars` | int | `1500` | Tail kept when trimming |
-| `compress_keep_recent_msgs` | int | `2` | Most recent messages never trimmed |
-| `compress_archive` | bool | `true` | Archive the removed text under the plugin data dir |
-| `log_events` | bool | `true` | One JSONL line per request |
-| `warn_on_break` | bool | `true` | Log on breaks and over-budget payloads |
-| `defer_to` | list | `["astrbot_plugin_context_slim"]` | If these are installed, observe only |
+| `enabled` | bool | `true` | Master switch; the hook returns immediately when off |
+| `mode` | string | `observe` | `observe` observes only; `guard` permits compression below |
+| `max_tail_chars` | int | `3000` | Warn when the tail injection exceeds this many characters; `0` disables |
+| `max_context_chars` | int | `0` | Warn when total history characters exceed this; `0` disables |
+| `compress_tool_results` | bool | `false` | Tool-result trimming |
+| `compress_tool_keep_recent` | int | `2` | Keep this many most recent tool results verbatim |
+| `compress_tool_preview_chars` | int | `120` | Characters kept from the first line after trimming |
+| `compress_oversize` | bool | `false` | Oversized-message trimming |
+| `compress_max_msg_chars` | int | `12000` | Only messages longer than this are processed |
+| `compress_keep_head_chars` | int | `4000` | Characters kept from the head |
+| `compress_keep_tail_chars` | int | `1500` | Characters kept from the tail |
+| `compress_keep_recent_msgs` | int | `2` | Most recent messages are never trimmed |
+| `compress_archive` | bool | `true` | Archive trimmed originals into the plugin data directory |
+| `log_events` | bool | `true` | Write one JSONL line per request |
+| `warn_on_break` | bool | `true` | Log on breaks or budget overruns |
+| `defer_to` | list | `["astrbot_plugin_context_slim"]` | Defer list; observation only when these are installed |
 
 ## Commands
 
 | Command | Effect |
 |---|---|
-| `/上下文` | Summary: mode, hit rate, miss per request, break count, compression savings |
-| `/上下文 诊断` | Detail of the latest request |
-| `/上下文 归因` | Count and share per cause |
-| `/上下文 重置` | Clear the current run's stats |
-| `/上下文 压缩 on\|off` | Toggle all compression |
+| `/上下文` | Summary: mode, hit rate, miss per request, breaks, compression savings |
+| `/上下文 诊断` | Details of the most recent request |
+| `/上下文 归因` | Counts and share per cause |
+| `/上下文 重置` | Clear statistics for the current run |
+| `/上下文 压缩 on\|off` | Toggle all compression at runtime, nothing written to disk |
 
-## Things you should know
+## How it works
 
-- On my box the injected tail runs 2,000–3,600 characters. The default 3,000 already filters out most normal turns; if you run more plugins and your tail is fatter, raise it, or set `max_tail_chars` to 0.
-- Token counts are estimated from characters, and they read low. One measured case: estimated 22,755 against an actual 32,021 — 30% off. Use them for magnitude, not for accounting.
-- Stats start when the plugin starts and reset on restart. No history is backfilled. If you want a record, keep `events.jsonl`.
-- Hit rate depends entirely on whether your provider reports cache usage. Models that don't report it give you totals only.
-- "The prefix didn't change" and "the request was cheap" are different statements; provider cache expiry, eviction and routing sit in between.
-- Only plain-text `content` is handled. Multimodal part lists are skipped rather than rewritten on a guess.
-- A trimmed message is visibly trimmed to the model. That is intentional; the elision is marked.
-- The dashboard needs AstrBot 4.16+. Older versions still have the commands.
+1. Hooks `on_llm_request` at priority `-20`, i.e. last, so it sees the final payload assembled by every other plugin.
+2. Fingerprints the system prompt, tool definitions, each history message and the tail injection, then diffs against the previous turn. Order: session start → system prompt → tool definitions → first differing history message → length change → tail change.
+3. Attribution runs before compression, so breaks caused by other plugins and trims caused by this plugin are recorded separately.
+4. After the response arrives, usage is read and hit/miss tokens are attributed to that request. When the provider does not report cache fields, only totals are recorded — never a fabricated 0%.
 
-## Running next to other context plugins
+## Compression (off by default)
 
-`defer_to` ships with `astrbot_plugin_context_slim`. When it's installed this plugin observes only, and says so on the dashboard, so two plugins don't rewrite each other's history.
+| Mode | Config | When it helps | Cost |
+|---|---|---|---|
+| Tool-result trimming | `compress_tool_results` | Other plugins dump whole pages, files or long logs into history and later turns no longer reference them | Edits land mid-history; raise `compress_tool_keep_recent` alongside |
+| Oversized-message trimming | `compress_oversize` | A single message is tens of thousands of characters (documents, pasted logs, OCR output) and is no longer in the recent window | Keeps head and tail, drops the middle, archives the original |
 
-Point `defer_to` at something else, or empty it to defer to nobody.
+Both require `mode=guard`; nothing is rewritten under `observe`. `/上下文 压缩 on|off` toggles them at runtime without touching the config file.
 
-Core's built-in overflow compression overlaps in one place: both rewrite history. This plugin's position is to look first — use the dashboard to confirm whether the low hit rate is really caused by long history, and whether core's compression is already running. Then enable `guard` and trim only the part you own, booked separately as `trim`.
+Compression edits messages in history. Since cache hits require a byte-identical prefix, everything after the edited message is re-billed. The "break turns vs clean turns" split on the panel exists to account for that trade-off.
 
-## Where data goes
+## Why there is no LLM summarization
 
-Only the plugin's own data directory.
+AstrBot's core overflow strategy already handles it: when the context exceeds the model window, history is truncated or rewritten. Reimplementing it would be duplicate work and would fight the core's rewriting.
 
-- `events.jsonl` — one line per request, written when `log_events=true`, rotated when it grows too large.
-- `archive/` — the text removed by trimming, named by content hash, written once per distinct content; past the size cap it is counted but not written.
+The more important reason is determinism. An LLM summary differs every turn; writing it back into history means rewriting the prefix on every turn — precisely the cost this plugin exists to remove. Trimming can be deterministic; summarization cannot.
 
-Deleting either is harmless. Turning the switches off stops them being produced.
+## Coexistence with other context plugins
 
-## Privacy
+`defer_to` includes `astrbot_plugin_context_slim` by default. When that plugin is installed, this one observes only and states that it is deferring, so two plugins never rewrite history at once.
 
-The plugin makes no outbound requests. Observations and archived text stay local; nothing is reported or telemetered.
+Add other plugin names to defer to them, or clear the list to defer to nobody.
 
-`observe` modifies nothing in `req`. `guard` modifies text of history messages only. Any failure logs at debug level and returns zero stats; it never takes the chat pipeline down.
+With the core overflow compression, the overlap is "both rewrite history". Use the panel first to confirm whether the low hit rate is caused by an oversized history or by the core already rewriting, then enable `guard` and trim only what this plugin should trim.
 
-It also registers no LLM tools. Tool definitions ride in the prompt every turn, which is a permanent cost, and an observability plugin shouldn't make itself expensive.
+## Limitations
+
+- Only requests passing through this plugin's hook are counted; calls made with the same API key by other programs are excluded.
+- The official console counts the whole account and is not directly comparable to the panel (see measured data above).
+- When a provider omits cache fields, only totals are available and the hit rate is reported as unavailable.
+- Statistics start at plugin load, reset on restart, and are not backfilled. `events.jsonl` can be retained externally.
+- Token estimates on the panel are character-based and run roughly 30% low in practice. Use them for magnitude only, never for billing reconciliation.
+- "The prefix changed" and "the bill hit the cache" are different questions; provider-side cache expiry, eviction and routing sit in between.
+- Only plain-text content is processed. Multimodal part lists are skipped and never rewritten.
+- Trimmed messages keep an omission marker that the model can see. This is intentional.
+- The dashboard requires AstrBot 4.16 or later; older versions use commands only.
+- The tail budget defaults to 3,000 characters. Measured injections run 2,000–3,600; heavier plugin stacks can exceed that, so raise it or set `0`.
+
+## Data and privacy
+
+The plugin writes only to its own data directory:
+
+- `events.jsonl`: one line per request when `log_events=true`; rotated when oversized.
+- `archive/`: trimmed originals, named by content hash, written once per unique content, counted but not written after the size cap.
+
+Removing these files does not affect operation; turning the switches off stops them being produced.
+
+The plugin makes no external requests, has no telemetry and reports nothing. `observe` mode leaves `req` untouched; `guard` touches history text only. Any exception is logged and returns zero statistics — the chat pipeline is never interrupted.
+
+Note: `events.jsonl` contains `umo`, which embeds platform account identifiers. Redact before sharing publicly.
+
+## Changelog
+
+**2.0.1**
+
+- Default `max_tail_chars` raised from 1800 to 3000: measured tail injections regularly exceed the old default, so the warning fired on almost every request.
+- Cache-field notice now distinguishes "model does not report it" from "no successful request yet".
+
+**2.0.0**
+
+- First release: request attribution, usage reconciliation, dashboard, optional deterministic compression.
 
 ## License
 
