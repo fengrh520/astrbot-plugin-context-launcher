@@ -1,4 +1,4 @@
-"""上下文管家（Context Launcher）v2.0.0
+"""上下文管家（Context Launcher）v2.0.1
 
 把「上下文为什么贵」变成可读的归因，并在你明确允许时做**确定性**压缩。
 
@@ -45,7 +45,7 @@ except Exception:  # noqa: BLE001
     from core.compress import CompressConfig, ContextCompressor, content_text  # type: ignore
 
 PLUGIN_NAME = "astrbot_plugin_context_launcher"
-PLUGIN_VERSION = "2.0.0"
+PLUGIN_VERSION = "2.0.1"
 
 # 负数优先级 = 最后执行，看到所有插件注入完的最终 payload，不和别人抢顺序
 HOOK_PRIORITY = -20
@@ -180,7 +180,7 @@ class ContextLauncher(Star):
         if self.mode not in ("observe", "guard"):
             self.mode = "observe"
 
-        self.max_tail_chars = max(0, int(cfg.get("max_tail_chars", 1800) or 0))
+        self.max_tail_chars = max(0, int(cfg.get("max_tail_chars", 3000) or 0))
         self.max_context_chars = max(0, int(cfg.get("max_context_chars", 0) or 0))
         self.log_events = bool(cfg.get("log_events", True))
         self.warn_on_break = bool(cfg.get("warn_on_break", True))
@@ -659,7 +659,7 @@ class ContextLauncher(Star):
             "🐟 上下文管家 · 本次运行",
             f"请求 {_fmt_int(data['req'])} 次 · 命中率 {data['hit_rate'] * 100:.1f}%"
             if data["cache_supported"]
-            else f"请求 {_fmt_int(data['req'])} 次 · 该模型不返回缓存命中数据",
+            else f"请求 {_fmt_int(data['req'])} 次 · 还没拿到缓存字段（模型可能不支持，或这些请求没返回用量）",
             f"命中 {_fmt_int(data['hit_tokens'])} / 未命中 {_fmt_int(data['miss_tokens'])} tok",
             f"平均每轮未命中 {_fmt_int(round(data['miss_per_turn']))} tok",
             f"前缀断点 {data['breaks']} 次 · 仅尾部变化 {data['tail_changes']} 次",

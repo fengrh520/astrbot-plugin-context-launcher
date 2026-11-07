@@ -4,7 +4,7 @@ An AstrBot plugin that shows whether each LLM request actually hit the prefix ca
 
 It reads the assembled request and does not touch it. Default mode is `observe`: not a single byte is modified. No LLM tools registered, no network calls, one JSONL file in its own data directory.
 
-AstrBot 4.16+ · no third-party dependencies · MIT · v2.0.0 · [中文](README.md)
+AstrBot 4.16+ · no third-party dependencies · MIT · v2.0.1 · [中文](README.md)
 
 Prefix caching is a discount from the provider: if the start of this request is byte-identical to the last one, that part is billed at the cache rate, usually about a tenth of the normal price. So the expensive thing isn't a long context — it's a context whose beginning keeps changing, and everything after the change point gets recomputed.
 
@@ -43,27 +43,31 @@ It fingerprints three things separately: the system prompt, the tool definitions
 
 Hit rate is not estimated. It comes from the provider's `prompt_cache_hit_tokens` and `prompt_cache_miss_tokens`. When a provider doesn't return those fields the dashboard says so plainly instead of showing a fake 0%.
 
-## Two days on my own box
+## Four days on my own box
 
 A 4C4G Tencent Cloud instance running OneBot and DeepSeek, observe mode, all compression off.
 
-25 requests the plugin recorded (11-04 02:13 through 11-05 10:14):
+54 requests the plugin recorded (11-04 02:13 through 11-07 19:08):
 
 ```
-23 turns had an unchanged prefix (1 of them still missed the cache), 2 were session starts
-On the unchanged ones: median hit rate 94.3%, median miss 2,259 tokens
-System prompt 12,840 chars, 45 tool definitions — in the prompt every turn
-History grew from 146 to 200 messages, 18k to 24k characters
+48 turns had an unchanged prefix, 4 were session starts, 2 had an old message edited in place
+On the unchanged ones: median hit rate 94.1%, median miss 2,352 tokens (worst 22,293, best 232)
+System prompt 12,840 chars (13,645 after a summary is injected), 45 tool definitions — in the prompt every turn
+History stayed between 102 and 200 messages; it was trimmed once
 ```
 
 The provider's own numbers from the same machine (`deepseek-flash`):
 
 ```
-10-27 ~ 11-02   561 requests   hit 66.0%   8,453 miss tokens per request
-11-03 ~ 11-04    57 requests   hit 92.7%   2,578 miss tokens per request
+10-27 ~ 11-02    561 requests   hit 66.0%   8,453 miss tokens per request
+11-03 ~ 11-07     87 requests   hit 90.2%   3,912 miss tokens per request
+last 7 days      177 requests   hit 81.9%   5,702 miss tokens per request
+all (from 10-23) 1,332 requests hit 78.9%   6,481 miss tokens per request
 ```
 
-Early in November I cut tool definitions from ~100 to 45 and shrank the history from 1.06M characters to 216k. The plugin was installed after that, so what it recorded is the post-change state. More than one thing changed in between, so those two lines are not the credit of any single edit.
+The last two rows exist for reconciliation. The official console counts everything on the account, so it lands in the 79–82% range; this dashboard only counts what happened after the plugin was installed, i.e. the post-optimization days, so it reads low-90s. Both are right — they just cover different windows. Compare like for like.
+
+Early in November I cut tool definitions from ~100 to 45 and shrank the history from 1.06M characters to 216k. The plugin was installed after that, so what it recorded is the post-change state. More than one thing changed in between, so these numbers are not the credit of any single edit.
 
 The interesting row is this one:
 
@@ -104,7 +108,7 @@ Mirrors `_conf_schema.json`. Most people only need the first two rows.
 |---|---|---|---|
 | `enabled` | bool | `true` | Master switch; the hooks return immediately when off |
 | `mode` | string | `observe` | `observe` only measures; `guard` allows compression |
-| `max_tail_chars` | int | `1800` | Warn when the injected tail exceeds this; `0` disables |
+| `max_tail_chars` | int | `3000` | Warn when the injected tail exceeds this; `0` disables |
 | `max_context_chars` | int | `0` | Warn when total history chars exceed this; `0` disables |
 | `compress_tool_results` | bool | `false` | Trim tool results |
 | `compress_tool_keep_recent` | int | `2` | Keep the last N tool results verbatim |
@@ -131,7 +135,7 @@ Mirrors `_conf_schema.json`. Most people only need the first two rows.
 
 ## Things you should know
 
-- On my box the injected tail runs 2,600–3,400 characters, so the default 1,800 warning line fires on essentially every request. Raise it above 3,000, or set `max_tail_chars` to 0.
+- On my box the injected tail runs 2,000–3,600 characters. The default 3,000 already filters out most normal turns; if you run more plugins and your tail is fatter, raise it, or set `max_tail_chars` to 0.
 - Token counts are estimated from characters, and they read low. One measured case: estimated 22,755 against an actual 32,021 — 30% off. Use them for magnitude, not for accounting.
 - Stats start when the plugin starts and reset on restart. No history is backfilled. If you want a record, keep `events.jsonl`.
 - Hit rate depends entirely on whether your provider reports cache usage. Models that don't report it give you totals only.

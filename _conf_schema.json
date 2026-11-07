@@ -18,7 +18,7 @@
     "type": "int",
     "description": "尾部注入（extra_user_content_parts）字符上限，超了只告警、绝不改写。什么时候该调：面板里 tail 归因频繁、每轮未命中异常高时，先调低看看是不是尾部本身太长。0=不检查。",
     "slider": {"min": 0, "max": 20000, "step": 100},
-    "default": 1800
+    "default": 3000
   },
   "max_context_chars": {
     "type": "int",

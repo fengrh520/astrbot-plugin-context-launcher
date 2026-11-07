@@ -471,7 +471,7 @@
         const cacheBar = byId("notice-cache");
         if (d.cache_supported === false) {
             setText("notice-cache", t("views.dashboard.notice.cacheUnsupported",
-                "该模型不返回缓存命中数据，仅统计总量。"));
+                "还没拿到缓存字段：可能模型不返回，也可能这些请求还没返回用量。"));
             show(cacheBar);
         } else {
             hide(cacheBar);
